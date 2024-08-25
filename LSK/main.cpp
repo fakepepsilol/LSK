@@ -259,6 +259,32 @@ void encode(uint8_t* originalArray, int key) {
     tempByte = shiftRight(tempByte);
     originalArray[7] = tempByte;
 
+
+
+
+    tempByte = originalArray[8];
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftLeft(tempByte);
+    originalArray[8] = tempByte;
+
+    tempByte = originalArray[9];
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftLeft(tempByte);
+    originalArray[9] = tempByte;
+
+
 }
 
 
@@ -428,7 +454,7 @@ void sendCommand() {
 
     int recvBufLen = 128;
 
-    uint8_t data[512] = { 0x3b, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00, 0x00, 0x78, 0x72, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t data[512] = { 0x3b, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     memset(data + 10, 0, sizeof(data) - 10);
     data[14] = username.length(); // username length
     for (int i = 17, j = 0; i < (17 + username.length()); i++, j++) {
