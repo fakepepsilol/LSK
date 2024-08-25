@@ -16,12 +16,12 @@
 
 #include <Shlobj.h>
 #include <Shlobj_core.h>
-#pragma comment(lib, "shell32.lib")
 
+#pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
-
-int key = 0x21BF32C8;
+//int key = 0x2A5FBD4;
+int key = 0x3DBF5EC8;
 
 
 int shiftLeft(int byte);
@@ -399,7 +399,7 @@ void sendCommand() {
 
     int recvBufLen = 128;
 
-    uint8_t data[512] = { 0x3b, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00, 0x00, 0x08, 0x7c, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t data[512] = { 0x3b, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00, 0x00, 0x78, 0x72, 0x00, 0x00, 0x00, 0x00 };
     memset(data + 10, 0, sizeof(data) - 10);
     data[14] = username.length(); // username length
     for (int i = 17, j = 0; i < (17 + username.length()); i++, j++) {
