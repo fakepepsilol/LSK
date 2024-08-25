@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <conio.h>
 #include <ctype.h>
+#include <bitset>
 
 
 #include <Shlobj.h>
@@ -21,7 +22,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 //int key = 0x2A5FBD4;
-int key = 0x3DBF5EC8;
+int key = 0x2A5FBD4;
 
 
 int shiftLeft(int byte);
@@ -58,12 +59,34 @@ void signalHandler(int signum) {
     exit(signum);
 }
 
+int generateKeyFromIP(char* inverted_seed) {
+    int seed = 0;
+    seed |= ((inverted_seed[3] & 0xFF) << 24);
+    seed |= ((inverted_seed[2] & 0xFF) << 16);
+    seed |= ((inverted_seed[1] & 0xFF) << 8);
+    seed |= ((inverted_seed[0] & 0xFF) << 0);
+
+    std::cout << "[*] Seed = 0x" << std::hex << seed << "\n";
+    // C8 00 A8 C0
+    
+    srand(seed);
+    rand();
+    rand();
+    rand();
+    rand();
+    rand(); 
+    int top_half = rand() << 0x10;
+    int bottom_half = rand();
+    int key = top_half | bottom_half;
+    // yes, this is how the program does it, it's not that i write bad code (even though i do)
+
+
+    std::cout << "[*] Key = 0x" << std::hex << key << "\n";
+    return seed;
+}
 
 int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
-
-
-
 
     if (argc < 2) {
         std::cerr << "Not enough arguments!\nUsage: " << argv[0] << " <ip address>";
@@ -276,7 +299,12 @@ void connectToIP(char* ip_address) {
         WSACleanup();
         exit(1);
     }
+    struct sockaddr* sockaddr_ptr = ptr->ai_addr;
+    char* sa_data = sockaddr_ptr->sa_data + 2;
+    generateKeyFromIP(sa_data);
 
+    // 03 1c c0 a8 00 c8
+    // XX XX C8 00 A8 C0
 }
 
 std::string trim(const std::string& str){
