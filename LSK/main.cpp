@@ -22,7 +22,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 //int key = 0x2A5FBD4;
-int key = 0x2A5FBD4;
+int key = 0;
 
 
 int shiftLeft(int byte);
@@ -77,10 +77,11 @@ int generateKeyFromIP(char* inverted_seed) {
     rand(); 
     int top_half = rand() << 0x10;
     int bottom_half = rand();
-    int key = top_half | bottom_half;
+    int newKey = top_half | bottom_half;
     // yes, this is how the program does it, it's not that i write bad code (even though i do)
 
 
+    key = newKey;
     std::cout << "[*] Key = 0x" << std::hex << key << "\n";
     return seed;
 }
