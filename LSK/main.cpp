@@ -13,7 +13,7 @@
 #include <conio.h>
 #include <ctype.h>
 #include <bitset>
-
+#include <direct.h>
 
 #include <Shlobj.h>
 #include <Shlobj_core.h>
@@ -39,6 +39,7 @@ std::string trim(const std::string& str);
 
 std::string getUsername();
 void setUsername();
+bool firstRun;
 
 void sendCommand();
 void sendMessage();
@@ -52,6 +53,19 @@ SOCKET s = INVALID_SOCKET;
 WSADATA wsaData;
 int iResult;
 char* ip;
+
+bool folderExists(const std::string& folderPath) {
+    struct stat info;
+    if (stat(folderPath.c_str(), &info) != 0) {
+        return false;
+    }
+    else if (info.st_mode & S_IFDIR) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 void signalHandler(int signum) {
     std::cerr << "\n\n\nInterrupt signal: " << signum << " received.\n";
@@ -134,20 +148,20 @@ int main(int argc, char* argv[]) {
     }
 
     clearScreen();
+    
+
+
     HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &usernameWpath);
+    username = getUsername();
     std::wcout << L"[*] Config folder: " << usernameWpath << "\\AppData\\Local\\LanSchool_owo\\\n";
-
-
-
     ip = argv[1];
 
     connectToIP(ip);
-    
-    username = getUsername();
+
     std::cout << "[*] Key = 0x" << std::hex << key << "\n";
-    std::cout << "Welcome back, " << ((username == "") ? "<no username>" : username) << "\n";
-    
-    
+    if (!firstRun) {
+        std::cout << "Welcome back, " << ((username == "") ? "<no username>" : username) << "\n";
+    }
 
     std::cout << "\
 0. set username\n\
@@ -169,7 +183,7 @@ int main(int argc, char* argv[]) {
                 choice = std::stoi(input);
                 break;
             }
-            catch (const std::invalid_argument& e) {
+            catch (const std::invalid_argument& (void)) {
                 break;
             }
         }
@@ -355,6 +369,9 @@ std::string getUsername() {
     std::string userFolderPathStr(userFolderPath.begin(), userFolderPath.end());
     std::string usernameConfigPath = userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\username.txt";
     std::ifstream inputUsernameConfigFileHandle(usernameConfigPath);
+
+
+
     if (inputUsernameConfigFileHandle.is_open()) {
         std::getline(inputUsernameConfigFileHandle, tempUsername);
         inputUsernameConfigFileHandle.close();
@@ -363,40 +380,24 @@ std::string getUsername() {
         return "";
     }
     else if (tempUsername == "") {
+        firstRun = true;
         setUsername();
+        return username;
     }
     return trim(tempUsername);
 }
 
-
-
-
-void setUsername() {
-
-
-    std::wstring userFolderPath(usernameWpath);
-    std::string userFolderPathStr(userFolderPath.begin(), userFolderPath.end());
-    std::string usernameConfigPath = userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\username.txt";
-    std::ifstream inputUsernameConfigFileHandle(usernameConfigPath);
-    if (inputUsernameConfigFileHandle.is_open()) {
-        std::getline(inputUsernameConfigFileHandle, username);
-        inputUsernameConfigFileHandle.close();
-    }
-
-    std::string newUsername;
+std::string inputString(int maxLength) {
+    std::string returnString;
     std::string temp;
-    if (username != "") {
-        std::cout << "Old username: " << ((username == "$empty") ? "<no username>" : username) << "\n";
-    }
-    std::cout << "Please set a username: ";
     while (true) {
         temp = std::cin.get();
         if (temp == "\n") {
-            newUsername = trim(newUsername);
-            if (newUsername == "") {
-                newUsername = "";
+            returnString = trim(returnString);
+            if (returnString == "") {
+                returnString = "";
                 int ch;
-                std::cout << "Are you sure you want to remove your username? [Y/N] ";
+                std::cout << "Are you sure you want to enter an empty string? [Y/N] ";
                 do
                 {
                     ch = _getch();
@@ -407,29 +408,61 @@ void setUsername() {
                 _putch('\r');    // Carriage return
                 _putch('\n');    // Line feed
                 if (ch == 'Y') {
-                    newUsername = "$empty";
+                    returnString = "$empty";
                     break;
                 }
-                else {
-                    std::cout << "Please set a username: ";
-                }
             }
-            else if (newUsername.length() > 64){
-                std::cout << "Please keep the username shorter than 64 characters.\nPlease set a username: ";
-                newUsername = "";
+            else if (returnString.length() > maxLength) {
+                std::cout << "Please keep the input shorter than " << maxLength << " characters.";
+                returnString = "";
             }
             else {
                 break;
             }
         }
         else {
-            newUsername += temp;
+            returnString += temp;
         }
     }
+    return returnString;
+}
+
+
+void setUsername() {
+
+
+    std::wstring userFolderPath(usernameWpath);
+    std::string userFolderPathStr(userFolderPath.begin(), userFolderPath.end());
+    std::string usernameConfigPath = userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\username.txt";
+    std::string configFolderPath = (userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\");
+    if (!folderExists(configFolderPath)) {
+        if (!_mkdir(configFolderPath.c_str())) {
+            std::cout << "[*] Config folder created!\n";
+        }
+        else {
+            std::cout << "[!] Failed to create config folder!\n";
+            exit(1);
+        }
+    }
+
+    std::ifstream inputUsernameConfigFileHandle(usernameConfigPath);
+    if (inputUsernameConfigFileHandle.is_open()) {
+        std::getline(inputUsernameConfigFileHandle, username);
+        inputUsernameConfigFileHandle.close();
+    }
+
+    if (username != "") {
+        std::cout << "Old username: " << ((username == "$empty") ? "<no username>" : username) << "\n";
+    }
+    
+    std::cout << "Please set a username: ";
+    std::string newUsername = inputString(64);
+
     std::ofstream outputUsernameConfigFileHandle(usernameConfigPath);
     if (outputUsernameConfigFileHandle.is_open()) {
         outputUsernameConfigFileHandle << newUsername;
-        std::cout << "Your new username is " << ((newUsername == "$empty") ? "<no username>" : newUsername);
+        std::cout << "Your new username is: " << ((newUsername == "$empty") ? "<no username>\n" : newUsername + "\n");
+        username = newUsername;
         outputUsernameConfigFileHandle.close();
     }
 }
@@ -572,6 +605,43 @@ void keepAliveThread() {
             closesocket(s);
             exit(1);
         }
+        char recvData[0xFF];
+        char messageBuffer[0xFF];
+        int bytesReceived = 8;
+        memset(messageBuffer, 0, sizeof(messageBuffer));
+        iResult = recv(s, recvData, 8, 0);
+        if (iResult == -1) {
+            std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
+            signalHandler(0);
+        }
+        else {
+            memcpy(messageBuffer, recvData, 8);
+            int totalLength = recvData[6];
+
+            while (bytesReceived < totalLength) {
+                int remaining = totalLength - bytesReceived;
+                iResult = recv(s, messageBuffer + bytesReceived, remaining, 0);
+
+                if (iResult == -1) {
+                    std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
+                    signalHandler(0);
+                    break;
+                }
+
+                bytesReceived += iResult;
+            }
+        }
+        // message starts at [8+6] and ends with a null byte (0x00)
+        
+        if (messageBuffer[6] > 0xF) {
+            std::cout << "\nStudent: ";
+            for (int i = 0xE; i < bytesReceived; i++) {
+                printf("%c", messageBuffer[i]);
+            }
+            std::cout << "\n";
+        }
+        
+        
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
@@ -601,9 +671,10 @@ void beginChat() {
     runChatThread = true;
     std::thread chatThreadInstance(keepAliveThread);
     while (true) {
-        std::string message;
         std::cout << "> ";
-        char temp;
+        std::string message = inputString(110);
+        
+        /*char temp;
         while (true) {
             temp = std::cin.get();
             if (temp == '\n') {
@@ -622,7 +693,7 @@ void beginChat() {
         if (message.length() == 0) {
             std::cout << "Cannot send empty message.";
             return;
-        }
+        }*/
         if (message == "$exit") {
             uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 141 /*length*/, 0x00 , 0x00 , 0x00, 0x02 };
             memset(data + 11, 0, sizeof(data) - 11);
@@ -658,10 +729,11 @@ void beginChat() {
             encode(data, key);
             iResult = send(s, reinterpret_cast<const char*>(data), 141 + message.length(), 0);
             if (iResult != 141 + message.length()) {
-                std::cerr << "\nSend failed: " << WSAGetLastError();
+                std::cerr << "\nSend failed: " << WSAGetLastError() << "\n";
                 closesocket(s);
                 exit(1);
             }
+            
         }
         
     }
