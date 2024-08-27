@@ -571,21 +571,21 @@ void sendMessage() {
             return;
         }
     }
-
+    int messageLength = (int)message.length();
     uint8_t data[512] = { 0x1d, 0x03, 0x01, 0x00, 0xda, 0xd1};
     memset(data + 10, 0, sizeof(data) - 10);
-    data[6] = message.length() + 139;
+    data[6] = messageLength + 139;
     for (int i = 10, j = 0; i < 74 && j < usernameLength; i++, j++) {
         data[i] = username[j];
     }
-    for (int i = 138, j = 0; i < (message.length() + 138); i++, j++) {
+    for (int i = 138, j = 0; i < (messageLength + 138); i++, j++) {
         data[i] = message[j];
     }
     encode(data, key);
     closesocket(s);
     connectToIP(ip);
-    iResult = send(s, reinterpret_cast<const char*>(data), 139 + message.length(), 0);
-    if (iResult != (139 + message.length())) {
+    iResult = send(s, reinterpret_cast<const char*>(data), 139 + messageLength, 0);
+    if (iResult != (139 + messageLength)) {
         std::cerr << "\nSend failed: " << WSAGetLastError();
         closesocket(s);
         exit(1);
@@ -659,7 +659,7 @@ void beginChat() {
         consoleHeight = csbi.dwSize.Y;
 
         // Set the cursor position to the bottom line
-        COORD bottomLine = { 0, consoleHeight - 1 };  // X is 0, Y is bottom row
+        COORD bottomLine = { 0, (SHORT)--consoleHeight};  // X is 0, Y is bottom row
         SetConsoleCursorPosition(hConsole, bottomLine);
     }
     ////////////////////////////////////////////////
@@ -673,7 +673,7 @@ void beginChat() {
     while (true) {
         std::cout << "> ";
         std::string message = inputString(110);
-        
+        int messageLength = (int)message.length();
         /*char temp;
         while (true) {
             temp = std::cin.get();
@@ -714,11 +714,11 @@ void beginChat() {
         else {
             uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00 /*length*/, 0x00 , 0x00 , 0x00, 0x05 };
             memset(data + 11, 0, sizeof(data) - 11);
-            for (int i = 12, j = 0; i < (12 + username.length()); i++, j++) {
+            for (int i = 12, j = 0; i < (12 + usernameLength); i++, j++) {
                 data[i] = username[j];
             }
-            data[6] = 141 + message.length();
-            for (int i = 140, j = 0; i < (140 + message.length()); i++, j++) {
+            data[6] = 141 + messageLength;
+            for (int i = 140, j = 0; i < (140 + messageLength); i++, j++) {
                 data[i] = message[j];
             }
 
@@ -727,7 +727,7 @@ void beginChat() {
             // 0x02 end
 
             encode(data, key);
-            iResult = send(s, reinterpret_cast<const char*>(data), 141 + message.length(), 0);
+            iResult = send(s, reinterpret_cast<const char*>(data), 141 + messageLength, 0);
             if (iResult != 141 + message.length()) {
                 std::cerr << "\nSend failed: " << WSAGetLastError() << "\n";
                 closesocket(s);
