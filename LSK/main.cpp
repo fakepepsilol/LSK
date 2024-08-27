@@ -45,6 +45,7 @@ void sendMessage();
 void beginChat(); bool runChatThread;
 
 std::string username;
+int usernameLength;
 
 PWSTR usernameWpath = NULL;
 SOCKET s = INVALID_SOCKET;
@@ -66,15 +67,14 @@ int generateKeyFromIP(char* inverted_seed) {
     seed |= ((inverted_seed[1] & 0xFF) << 8);
     seed |= ((inverted_seed[0] & 0xFF) << 0);
 
-    std::cout << "[*] Seed = 0x" << std::hex << seed << "\n";
-    // C8 00 A8 C0
+    //std::cout << "[*] Seed = 0x" << std::hex << seed << "\n";
     
     srand(seed);
-    rand();
-    rand();
-    rand();
-    rand();
-    rand(); 
+    (void)rand();
+    (void)rand();
+    (void)rand();
+    (void)rand();
+    (void)rand(); 
     int top_half = rand() << 0x10;
     int bottom_half = rand();
     int newKey = top_half | bottom_half;
@@ -82,7 +82,7 @@ int generateKeyFromIP(char* inverted_seed) {
 
 
     key = newKey;
-    std::cout << "[*] Key = 0x" << std::hex << key << "\n";
+    // std::cout << "[*] Key = 0x" << std::hex << key << "\n";
     return seed;
 }
 
@@ -107,8 +107,11 @@ int main(int argc, char* argv[]) {
 
 
     ip = argv[1];
+
     connectToIP(ip);
+    
     username = getUsername();
+    std::cout << "[*] Key = 0x" << std::hex << key << "\n";
     std::cout << "Welcome back, " << ((username == "") ? "<no username>" : username) << "\n";
     
     
@@ -134,7 +137,7 @@ int main(int argc, char* argv[]) {
                 break;
             }
             catch (const std::invalid_argument& e) {
-                
+                break;
             }
         }
     }
@@ -188,103 +191,66 @@ int shiftRight(int byte) {
 int getKeyByte(int key, int index) {
     return (key >> index * 8 & 0xFF);
 }
+byte encode_1(byte originalByte) {
+    byte tempByte = originalByte;
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftLeft(tempByte);
+    return tempByte;
+}
+byte encode_2(byte originalByte) {
+    byte tempByte = originalByte;
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftLeft(tempByte);
+    return tempByte;
+}
+byte encode_3(byte originalByte) {
+    byte tempByte = originalByte;
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftLeft(tempByte);
+    return tempByte;
+}
+byte encode_4(byte originalByte) {
+    byte tempByte = originalByte;
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftRight(tempByte);
+    return tempByte;
+}
+
 void encode(uint8_t* originalArray, int key) {
-    uint8_t tempByte;
-    tempByte = originalArray[0];
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftLeft(tempByte);
-    originalArray[0] = tempByte;
-
-    tempByte = originalArray[1];
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftLeft(tempByte);
-    originalArray[1] = tempByte;
-
-    //third byte skipped
-    //fourth byte skipped
-
-    tempByte = originalArray[4];
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftLeft(tempByte);
-    originalArray[4] = tempByte;
-
-    tempByte = originalArray[5];
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftLeft(tempByte);
-    originalArray[5] = tempByte;
-
-    tempByte = originalArray[6];
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftLeft(tempByte);
-    originalArray[6] = tempByte;
-
-    tempByte = originalArray[7];
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    originalArray[7] = tempByte;
-
-
-
-
-    tempByte = originalArray[8];
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftLeft(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftLeft(tempByte);
-    originalArray[8] = tempByte;
-
-    tempByte = originalArray[9];
-    tempByte = tempByte ^ getKeyByte(key, 2);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 1);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 0);
-    tempByte = shiftRight(tempByte);
-    tempByte = tempByte ^ getKeyByte(key, 3);
-    tempByte = shiftLeft(tempByte);
-    originalArray[9] = tempByte;
-
-
+    originalArray[0] = encode_1(originalArray[0]);
+    originalArray[1] = encode_2(originalArray[1]);
+    //originalArray[2] = encode_1(originalArray[2]);
+    //originalArray[3] = encode_1(originalArray[3]);
+    originalArray[4] = encode_1(originalArray[4]);
+    originalArray[5] = encode_2(originalArray[5]);
+    originalArray[6] = encode_3(originalArray[6]);
+    originalArray[7] = encode_4(originalArray[7]);
+    originalArray[8] = encode_1(originalArray[8]);
+    originalArray[9] = encode_2(originalArray[9]);
 }
 
 
@@ -438,9 +404,10 @@ void setUsername() {
 
 void sendCommand() {
 
-    std::string command;
     std::cin.get();
     std::cout << "Enter command (no spaces): ";
+
+    std::string command;
     char temp;
     while (true) {
         temp = std::cin.get();
@@ -456,22 +423,24 @@ void sendCommand() {
 
     uint8_t data[512] = { 0x3b, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     memset(data + 10, 0, sizeof(data) - 10);
-    data[14] = username.length(); // username length
-    for (int i = 17, j = 0; i < (17 + username.length()); i++, j++) {
+    usernameLength = (int)username.length();
+    int commandLength = (int)command.length();
+    data[14] = (uint8_t)usernameLength; // username length
+    for (int i = 17, j = 0; i < (17 + usernameLength); i++, j++) {
         data[i] = username[j];
     }
-    data[82] = (uint8_t)command.length();
-    data[6] = (command.length() * 2) + 0x57;
-    for (int i = 86, j = 0; i < (87 + command.length()); i++, j++) {
+    data[82] = (uint8_t)commandLength;
+    data[6] = (commandLength * 2) + 0x57;
+    for (int i = 86, j = 0; i < (87 + commandLength); i++, j++) {
         data[i] = command[j];
     }
-    for (int i = (86 + command.length()); i < 512; i++) {
+    for (int i = (86 + commandLength); i < 512; i++) {
         data[i] = 0x00;
     }
     encode(data, key);
 
-    iResult = send(s, reinterpret_cast<const char*>(data), 87 + command.length() * 2, 0);
-    if (iResult != (87 + command.length() * 2)) {
+    iResult = send(s, reinterpret_cast<const char*>(data), 87 + commandLength * 2, 0);
+    if (iResult != (87 + commandLength * 2)) {
         std::cerr << "\nSend failed: " << WSAGetLastError();
         closesocket(s);
         exit(1);
@@ -482,15 +451,23 @@ void sendCommand() {
         std::cout << "Failed (" << WSAGetLastError() << ") retrying..\n";
         closesocket(s);
         connectToIP(ip);
-        send(s, reinterpret_cast<const char*>(data), 87 + command.length() * 2, 0);
+        send(s, reinterpret_cast<const char*>(data), 87 + commandLength * 2, 0);
         iResult = recv(s, recvData, 0xFF, 0);
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
+
+
+
     std::cout << "Success, command sent to " << ip << " :3";
+    
+    
     return;
 }
 
 void sendMessage() {
+
+    usernameLength = (int)username.length();
+
     std::string message;
     std::cout << "Enter message: ";
     char temp;
@@ -529,10 +506,10 @@ void sendMessage() {
         }
     }
 
-    uint8_t data[512] = { 0x1d, 0x03, 0x01, 0x00, 0xda, 0xd1, 0xFF /*length + 139*/, 0x00, 0x08, 0x7c};
+    uint8_t data[512] = { 0x1d, 0x03, 0x01, 0x00, 0xda, 0xd1};
     memset(data + 10, 0, sizeof(data) - 10);
     data[6] = message.length() + 139;
-    for (int i = 10, j = 0; i < 74 && j < username.length(); i++, j++) {
+    for (int i = 10, j = 0; i < 74 && j < usernameLength; i++, j++) {
         data[i] = username[j];
     }
     for (int i = 138, j = 0; i < (message.length() + 138); i++, j++) {
@@ -553,7 +530,7 @@ void sendMessage() {
 }
 void keepAliveThread() {
     while (runChatThread){
-        uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x8d, 0x00 , 0x08 , 0x7c, 0x08}; //keep-alive-packet-thingy
+        uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x8d, 0x00 , 0x00 , 0x00, 0x08}; //keep-alive-packet-thingy
         encode(data, key);
         memset(data + 11, 0, sizeof(data) - 11);
         iResult = send(s, reinterpret_cast<const char*>(data), 141, 0);
@@ -594,12 +571,13 @@ void beginChat() {
             return;
         }
         if (message == "$exit") {
-            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x141 /*length of message*/, 0x00 , 0x08 , 0x7c, 0x02 };
+            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 141 /*length*/, 0x00 , 0x00 , 0x00, 0x02 };
             memset(data + 11, 0, sizeof(data) - 11);
             encode(data, key);
-            iResult = send(s, reinterpret_cast<const char*>(data), 141 + message.length(), 0);
-            if (iResult != 141 + message.length()) {
+            iResult = send(s, reinterpret_cast<const char*>(data), 141, 0);
+            if (iResult != 141) {
                 std::cerr << "\nSend failed: " << WSAGetLastError();
+                runChatThread = false;
                 closesocket(s);
                 exit(1);
             }
@@ -610,7 +588,7 @@ void beginChat() {
             
         }
         else {
-            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0xFF /*length of message*/, 0x00 , 0x08 , 0x7c, 0x05 };
+            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00 /*length*/, 0x00 , 0x00 , 0x00, 0x05 };
             memset(data + 11, 0, sizeof(data) - 11);
             for (int i = 12, j = 0; i < (12 + username.length()); i++, j++) {
                 data[i] = username[j];
