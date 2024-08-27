@@ -85,6 +85,39 @@ int generateKeyFromIP(char* inverted_seed) {
     // std::cout << "[*] Key = 0x" << std::hex << key << "\n";
     return seed;
 }
+void clearScreen() {
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD coordScreen = { 0, 0 };
+    DWORD cCharsWritten;
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    DWORD dwConSize;
+
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        return;
+    }
+
+    dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
+    if (!FillConsoleOutputCharacter(hConsole,
+        (TCHAR)' ',
+        dwConSize,
+        coordScreen,
+        &cCharsWritten))
+    {
+        return;
+    }
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        return;
+    }
+    if (!FillConsoleOutputAttribute(hConsole,
+        csbi.wAttributes,
+        dwConSize,
+        coordScreen,
+        &cCharsWritten))
+    {
+        return;
+    }
+    SetConsoleCursorPosition(hConsole, coordScreen);
+}
 
 int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
@@ -100,7 +133,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-   
+    clearScreen();
     HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &usernameWpath);
     std::wcout << L"[*] Config folder: " << usernameWpath << "\\AppData\\Local\\LanSchool_owo\\\n";
 
@@ -543,13 +576,33 @@ void keepAliveThread() {
     }
 }
 void beginChat() {
+    clearScreen();
+
+    ////////////////////////////////////////////////
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    int consoleWidth, consoleHeight;
+
+    // Get the console screen buffer information
+    if (GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        consoleWidth = csbi.dwSize.X;
+        consoleHeight = csbi.dwSize.Y;
+
+        // Set the cursor position to the bottom line
+        COORD bottomLine = { 0, consoleHeight - 1 };  // X is 0, Y is bottom row
+        SetConsoleCursorPosition(hConsole, bottomLine);
+    }
+    ////////////////////////////////////////////////
+
+
+
     closesocket(s);
     connectToIP(ip);
     runChatThread = true;
     std::thread chatThreadInstance(keepAliveThread);
     while (true) {
         std::string message;
-        std::cout << "Enter message: ";
+        std::cout << "> ";
         char temp;
         while (true) {
             temp = std::cin.get();
@@ -601,6 +654,7 @@ void beginChat() {
             // 0x08 keep-alive
             // 0x05 message
             // 0x02 end
+
             encode(data, key);
             iResult = send(s, reinterpret_cast<const char*>(data), 141 + message.length(), 0);
             if (iResult != 141 + message.length()) {
