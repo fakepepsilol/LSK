@@ -411,6 +411,9 @@ std::string inputString(int maxLength) {
                     returnString = "$empty";
                     break;
                 }
+                else {
+                    return "$failed";
+                }
             }
             else if (returnString.length() > maxLength) {
                 printf("Please keep the input shorter than %d characters.", maxLength);
@@ -534,15 +537,20 @@ void sendCommand() {
 void sendMessage() {
 
     usernameLength = (int)username.length();
+    
 
-    std::cout << "Enter message: ";
-    std::string message = inputString(100);
-    int messageLength = (int)message.length();
-    uint8_t data[512] = { 0x1d, 0x03, 0x01, 0x00, 0xda, 0xd1};
-    memset(data + 6, 0, sizeof(data) - 6);
+    std::string message = "$failed";
+    while (message == "$failed") {
+        std::cout << "Enter message: ";
+        message = inputString(100);
+    }
     if (message == "$empty") {
         message = "";
     }
+
+    int messageLength = (int)message.length();
+    uint8_t data[512] = { 0x1d, 0x03, 0x01, 0x00, 0xda, 0xd1};
+    memset(data + 6, 0, sizeof(data) - 6);
     data[6] = messageLength + 139;
     for (int i = 10, j = 0; i < 74 && j < usernameLength; i++, j++) {
         data[i] = username[j];
@@ -639,9 +647,19 @@ void beginChat() {
     connectToIP(ip);
     runChatThread = true;
     std::thread chatThreadInstance(keepAliveThread);
+
+    std::string message = "$failed";
+    
+
     while (true) {
-        std::cout << "> ";
-        std::string message = inputString(50000);
+        message = "$failed";
+        while (message == "$failed") {
+            std::cout << "> ";
+            message = inputString(1000);
+        }
+        if (message == "$empty") {
+            message = "";
+        }
         int messageLength = (int)message.length();
         if (message == "$exit") {
             uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 141 /*length*/, 0x00 , 0x00 , 0x00, 0x02 };
