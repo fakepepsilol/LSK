@@ -413,7 +413,8 @@ std::string inputString(int maxLength) {
                 }
             }
             else if (returnString.length() > maxLength) {
-                std::cout << "Please keep the input shorter than " << maxLength << " characters.";
+                printf("Please keep the input shorter than %d characters.", maxLength);
+                //std::cout << "Please keep the input shorter than " << maxLength << " characters.";
                 returnString = "";
             }
             else {
@@ -534,46 +535,14 @@ void sendMessage() {
 
     usernameLength = (int)username.length();
 
-    std::string message;
     std::cout << "Enter message: ";
-    char temp;
-    while (true) {
-        temp = std::cin.get();
-        if (temp == '\n') {
-            if (message.length() <= 115) {
-                break;
-            }
-            else {
-                std::cout << "Message too long. Messages can be up to 115 characters long.\nEnter message: ";
-                message = "";
-            }
-        }
-        else {
-            message += temp;
-        }
-    }
-    if (message.length() == 0) {
-        std::cout << "Send empty message? [Y/N] ";
-        int ch;
-        do
-        {
-            ch = _getch();
-            ch = toupper(ch);
-        } while (ch != 'Y' && ch != 'N');
-
-        _putch(ch);
-        _putch('\r');
-        _putch('\n');
-        if (ch == 'Y') {
-            message = "";
-        }
-        else {
-            return;
-        }
-    }
+    std::string message = inputString(100);
     int messageLength = (int)message.length();
     uint8_t data[512] = { 0x1d, 0x03, 0x01, 0x00, 0xda, 0xd1};
-    memset(data + 10, 0, sizeof(data) - 10);
+    memset(data + 6, 0, sizeof(data) - 6);
+    if (message == "$empty") {
+        message = "";
+    }
     data[6] = messageLength + 139;
     for (int i = 10, j = 0; i < 74 && j < usernameLength; i++, j++) {
         data[i] = username[j];
@@ -642,7 +611,7 @@ void keepAliveThread() {
         }
         
         
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }
 void beginChat() {
@@ -672,28 +641,8 @@ void beginChat() {
     std::thread chatThreadInstance(keepAliveThread);
     while (true) {
         std::cout << "> ";
-        std::string message = inputString(110);
+        std::string message = inputString(50000);
         int messageLength = (int)message.length();
-        /*char temp;
-        while (true) {
-            temp = std::cin.get();
-            if (temp == '\n') {
-                if (message.length() <= 110) {
-                    break;
-                }
-                else {
-                    std::cout << "Message too long. Messages can be up to 110 characters long.\nEnter message: ";
-                    message = "";
-                }
-            }
-            else {
-                message += temp;
-            }
-        }
-        if (message.length() == 0) {
-            std::cout << "Cannot send empty message.";
-            return;
-        }*/
         if (message == "$exit") {
             uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 141 /*length*/, 0x00 , 0x00 , 0x00, 0x02 };
             memset(data + 11, 0, sizeof(data) - 11);
@@ -712,12 +661,14 @@ void beginChat() {
             
         }
         else {
-            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00 /*length*/, 0x00 , 0x00 , 0x00, 0x05 };
+            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00 /*length (2nd byte)*/, 0x00 /*length (1st byte)*/ , 0x00 , 0x00, 0x05 };
+            data[6] = ((messageLength + 141) & 0xFF);
+            data[7] = ((messageLength + 141) & 0xFF00) >> 8;
             memset(data + 11, 0, sizeof(data) - 11);
             for (int i = 12, j = 0; i < (12 + usernameLength); i++, j++) {
                 data[i] = username[j];
             }
-            data[6] = 141 + messageLength;
+            //data[6] = 141 + messageLength;
             for (int i = 140, j = 0; i < (140 + messageLength); i++, j++) {
                 data[i] = message[j];
             }
