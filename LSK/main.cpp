@@ -459,8 +459,12 @@ void setUsername() {
         std::cout << "Old username: " << ((username == "$empty") ? "<no username>" : username) << "\n";
     }
     
-    std::cout << "Please set a username: ";
-    std::string newUsername = inputString(64);
+    
+    std::string newUsername = "$failed";
+    while (newUsername == "$failed") {
+        std::cout << "Please set a username: ";
+        newUsername = inputString(64);
+    }
 
     std::ofstream outputUsernameConfigFileHandle(usernameConfigPath);
     if (outputUsernameConfigFileHandle.is_open()) {
@@ -475,26 +479,24 @@ void setUsername() {
 void sendCommand() {
 
     std::cin.get();
-    std::cout << "Enter command (no spaces): ";
 
-    std::string command;
-    char temp;
-    while (true) {
-        temp = std::cin.get();
-        if (temp == '\n') {
-            break;
-        }
-        else {
-            command = command + temp;
-        }
+    std::string command = "$failed";
+    while (command == "$failed") {
+        std::cout << "Enter command (no spaces): ";
+        command = inputString(64);
+    }
+    if (command == "$empty") {
+        command = "";
     }
 
     int recvBufLen = 128;
 
     uint8_t data[512] = { 0x3b, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     memset(data + 10, 0, sizeof(data) - 10);
+
     usernameLength = (int)username.length();
     int commandLength = (int)command.length();
+
     data[14] = (uint8_t)usernameLength; // username length
     for (int i = 17, j = 0; i < (17 + usernameLength); i++, j++) {
         data[i] = username[j];
@@ -679,7 +681,7 @@ void beginChat() {
             
         }
         else {
-            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00 /*length (2nd byte)*/, 0x00 /*length (1st byte)*/ , 0x00 , 0x00, 0x05 };
+            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x00 /*length (2)*/, 0x00 /*length (1)*/ , 0x00 , 0x00, 0x05 };
             data[6] = ((messageLength + 141) & 0xFF);
             data[7] = ((messageLength + 141) & 0xFF00) >> 8;
             memset(data + 11, 0, sizeof(data) - 11);
