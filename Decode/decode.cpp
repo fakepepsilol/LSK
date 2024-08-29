@@ -22,10 +22,10 @@ int parseHex(const std::string& hexStr) {
 
 
 int main(){
-    uint8_t originalData[8];
+    uint8_t originalData[10];
     std::cout << "Enter data to decode: ";
     std::string hexStr;
-    for(int i = 0; i < 8; i++){
+    for(int i = 0; i < 10; i++){
         std::cin >> hexStr;
         if(hexStr.length() > 2){
             for(int j = 0; j < 16; j+=2){
@@ -37,7 +37,7 @@ int main(){
     }
 
     decode(originalData, key);
-    for(int i = 0; i < 8; i++){
+    for(int i = 0; i < 10; i++){
         if(originalData[i] < 0x10){
             std::cout << "0" << std::hex << int(originalData[i]) << " ";
         }else{
@@ -139,5 +139,30 @@ void decode(uint8_t* originalArray, int key){
     tempByte = shiftLeft(tempByte);
     tempByte = tempByte ^ getKeyByte(key, 3);
     originalArray[7] = tempByte;
+
+
+
+
+    tempByte = originalArray[8];
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    originalArray[8] = tempByte;
+
+    tempByte = originalArray[9];
+    tempByte = shiftRight(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 3);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 0);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 1);
+    tempByte = shiftLeft(tempByte);
+    tempByte = tempByte ^ getKeyByte(key, 2);
+    originalArray[9] = tempByte;
 
 }

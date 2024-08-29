@@ -22,8 +22,10 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 //int key = 0x2A5FBD4;
-int key = 0;
-
+int key;
+int seed;
+int currentInputLength = -1;
+std::string currentInputString;
 
 int shiftLeft(int byte);
 int shiftRight(int byte);
@@ -35,69 +37,43 @@ void connectToIP(char* ip_address);
 
 
 std::string trim(const std::string& str);
-
-
-std::string getUsername();
-void setUsername();
-bool firstRun;
-
-void sendCommand();
-void sendMessage();
-void beginChat(); bool runChatThread;
-
-std::string username;
-int usernameLength;
-
-PWSTR usernameWpath = NULL;
-SOCKET s = INVALID_SOCKET;
-WSADATA wsaData;
-int iResult;
-char* ip;
-
-bool folderExists(const std::string& folderPath) {
-    struct stat info;
-    if (stat(folderPath.c_str(), &info) != 0) {
-        return false;
+COORD GetConsoleCursorPosition()
+{
+    CONSOLE_SCREEN_BUFFER_INFO cbsi;
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cbsi))
+    {
+        return cbsi.dwCursorPosition;
     }
-    else if (info.st_mode & S_IFDIR) {
-        return true;
-    }
-    else {
-        return false;
+    else
+    {
+        // The function failed. Call GetLastError() for details.
+        COORD invalid = { 0, 0 };
+        std::cout << "getConsoleCursorPosition failed nigger.\n\n";
+        return invalid;
     }
 }
+COORD GetConsoleDimensions() {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    int columns, rows;
 
-void signalHandler(int signum) {
-    std::cerr << "\n\n\nInterrupt signal: " << signum << " received.\n";
-    runChatThread = false;
-    closesocket(s);
-    exit(signum);
+    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+    columns = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    COORD dimensions = { columns, rows };
+    return dimensions;
 }
+void gotoxy(short x, short y)
+{
+    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD position = { x, y };
 
-int generateKeyFromIP(char* inverted_seed) {
-    int seed = 0;
-    seed |= ((inverted_seed[3] & 0xFF) << 24);
-    seed |= ((inverted_seed[2] & 0xFF) << 16);
-    seed |= ((inverted_seed[1] & 0xFF) << 8);
-    seed |= ((inverted_seed[0] & 0xFF) << 0);
-
-    //std::cout << "[*] Seed = 0x" << std::hex << seed << "\n";
-    
-    srand(seed);
-    (void)rand();
-    (void)rand();
-    (void)rand();
-    (void)rand();
-    (void)rand(); 
-    int top_half = rand() << 0x10;
-    int bottom_half = rand();
-    int newKey = top_half | bottom_half;
-    // yes, this is how the program does it, it's not that i write bad code (even though i do)
-
-
-    key = newKey;
-    // std::cout << "[*] Key = 0x" << std::hex << key << "\n";
-    return seed;
+    SetConsoleCursorPosition(hStdout, position);
+}
+void clearLine() {
+    gotoxy(GetConsoleDimensions().X - 1, GetConsoleCursorPosition().Y);
+    for (int i = 0; i < GetConsoleDimensions().X - 1; i++) {
+        std::cout << "\b \b";
+    }
 }
 void clearScreen() {
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -133,9 +109,73 @@ void clearScreen() {
     SetConsoleCursorPosition(hConsole, coordScreen);
 }
 
+
+
+
+std::string getUsername();
+void setUsername();
+bool firstRun;
+
+void sendCommand();
+void sendMessage();
+void beginChat(); bool runChatThread;
+std::string inputString(int maxLength);
+std::string handleInput(int maxLength);
+
+std::string username;
+int usernameLength;
+
+PWSTR usernameWpath = NULL;
+SOCKET s = INVALID_SOCKET;
+WSADATA wsaData;
+int iResult;
+char* ip;
+
+bool folderExists(const std::string& folderPath) {
+    struct stat info;
+    if (stat(folderPath.c_str(), &info) != 0) {
+        return false;
+    }
+    else if (info.st_mode & S_IFDIR) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+void signalHandler(int signum) {
+    std::cerr << "\n\n\nInterrupt signal: " << signum << " received.\n";
+    runChatThread = false;
+    closesocket(s);
+    exit(signum);
+}
+int generateKeyFromIP(char* inverted_seed) {
+    seed = 0;
+    seed |= ((inverted_seed[3] & 0xFF) << 24);
+    seed |= ((inverted_seed[2] & 0xFF) << 16);
+    seed |= ((inverted_seed[1] & 0xFF) << 8);
+    seed |= ((inverted_seed[0] & 0xFF) << 0);
+
+    //std::cout << "[*] Seed = 0x" << std::hex << seed << "\n";
+    
+    srand(seed);
+    (void)rand();
+    (void)rand();
+    (void)rand();
+    (void)rand();
+    (void)rand(); 
+    int top_half = rand() << 0x10;
+    int bottom_half = rand();
+    int newKey = top_half | bottom_half;
+    // yes, this is how the program does it, it's not that i write bad code (even though i do)
+
+
+    key = newKey;
+    // std::cout << "[*] Key = 0x" << std::hex << key << "\n";
+    return seed;
+}
 int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
-
     if (argc < 2) {
         std::cerr << "Not enough arguments!\nUsage: " << argv[0] << " <ip address>";
         system("timeout /t 5");
@@ -148,8 +188,6 @@ int main(int argc, char* argv[]) {
     }
 
     clearScreen();
-    
-
 
     HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &usernameWpath);
     username = getUsername();
@@ -157,7 +195,7 @@ int main(int argc, char* argv[]) {
     ip = argv[1];
 
     connectToIP(ip);
-
+    std::cout << "[*] Seed = 0x" << std::hex << seed << "\n";
     std::cout << "[*] Key = 0x" << std::hex << key << "\n";
     if (!firstRun) {
         std::cout << "Welcome back, " << ((username == "") ? "<no username>" : username) << "\n";
@@ -343,8 +381,7 @@ void connectToIP(char* ip_address) {
     char* sa_data = sockaddr_ptr->sa_data + 2;
     generateKeyFromIP(sa_data);
 
-    // 03 1c c0 a8 00 c8
-    // XX XX C8 00 A8 C0
+
 }
 
 std::string trim(const std::string& str){
@@ -385,6 +422,48 @@ std::string getUsername() {
         return username;
     }
     return trim(tempUsername);
+}
+void setUsername() {
+
+
+    std::wstring userFolderPath(usernameWpath);
+    std::string userFolderPathStr(userFolderPath.begin(), userFolderPath.end());
+    std::string usernameConfigPath = userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\username.txt";
+    std::string configFolderPath = (userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\");
+    if (!folderExists(configFolderPath)) {
+        if (!_mkdir(configFolderPath.c_str())) {
+            std::cout << "[*] Config folder created!\n";
+        }
+        else {
+            std::cout << "[!] Failed to create config folder!\n";
+            exit(1);
+        }
+    }
+
+    std::ifstream inputUsernameConfigFileHandle(usernameConfigPath);
+    if (inputUsernameConfigFileHandle.is_open()) {
+        std::getline(inputUsernameConfigFileHandle, username);
+        inputUsernameConfigFileHandle.close();
+    }
+
+    if (username != "") {
+        std::cout << "Old username: " << ((username == "$empty") ? "<no username>" : username) << "\n";
+    }
+
+
+    std::string newUsername = "$failed";
+    while (newUsername == "$failed") {
+        std::cout << "Please set a username: ";
+        newUsername = inputString(64);
+    }
+
+    std::ofstream outputUsernameConfigFileHandle(usernameConfigPath);
+    if (outputUsernameConfigFileHandle.is_open()) {
+        outputUsernameConfigFileHandle << newUsername;
+        std::cout << "Your new username is: " << ((newUsername == "$empty") ? "<no username>\n" : newUsername + "\n");
+        username = newUsername;
+        outputUsernameConfigFileHandle.close();
+    }
 }
 
 std::string inputString(int maxLength) {
@@ -430,50 +509,42 @@ std::string inputString(int maxLength) {
     }
     return returnString;
 }
-
-
-void setUsername() {
-
-
-    std::wstring userFolderPath(usernameWpath);
-    std::string userFolderPathStr(userFolderPath.begin(), userFolderPath.end());
-    std::string usernameConfigPath = userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\username.txt";
-    std::string configFolderPath = (userFolderPathStr + "\\AppData\\Local\\LanSchool_owo\\");
-    if (!folderExists(configFolderPath)) {
-        if (!_mkdir(configFolderPath.c_str())) {
-            std::cout << "[*] Config folder created!\n";
+std::string handleInput(int maxLength) {
+    currentInputString = "";
+    currentInputLength = 0;
+    char ch;
+    std::cout << "> ";
+    while (true) {
+        ch = _getch();
+        if (ch == 13) {
+            break;
         }
-        else {
-            std::cout << "[!] Failed to create config folder!\n";
-            exit(1);
+        else if (ch == 8) {
+            if (!currentInputString.empty()) {
+                currentInputLength--;
+                currentInputString.pop_back();
+                std::cout << "\b \b";
+            }
         }
-    }
+        else if (currentInputLength < maxLength && (ch >= 32 && ch <= 126)) {
+            currentInputLength++;
+            currentInputString += ch;
+            std::cout << ch;
+        }
+        else if (ch == 3) {
+            std::cout << "$exit\n";
+            return "$exit";
+        }
 
-    std::ifstream inputUsernameConfigFileHandle(usernameConfigPath);
-    if (inputUsernameConfigFileHandle.is_open()) {
-        std::getline(inputUsernameConfigFileHandle, username);
-        inputUsernameConfigFileHandle.close();
     }
-
-    if (username != "") {
-        std::cout << "Old username: " << ((username == "$empty") ? "<no username>" : username) << "\n";
-    }
-    
-    
-    std::string newUsername = "$failed";
-    while (newUsername == "$failed") {
-        std::cout << "Please set a username: ";
-        newUsername = inputString(64);
-    }
-
-    std::ofstream outputUsernameConfigFileHandle(usernameConfigPath);
-    if (outputUsernameConfigFileHandle.is_open()) {
-        outputUsernameConfigFileHandle << newUsername;
-        std::cout << "Your new username is: " << ((newUsername == "$empty") ? "<no username>\n" : newUsername + "\n");
-        username = newUsername;
-        outputUsernameConfigFileHandle.close();
-    }
+    currentInputLength = -1;
+    std::cout << "\n";
+    std::string tempString = currentInputString;
+    currentInputString = "";
+    return tempString;
 }
+
+
 
 
 void sendCommand() {
@@ -573,6 +644,7 @@ void sendMessage() {
     return;
     
 }
+
 void keepAliveThread() {
     while (runChatThread){
         uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x8d, 0x00 , 0x00 , 0x00, 0x08}; //keep-alive-packet-thingy
@@ -600,7 +672,7 @@ void keepAliveThread() {
             while (bytesReceived < totalLength) {
                 int remaining = totalLength - bytesReceived;
                 iResult = recv(s, messageBuffer + bytesReceived, remaining, 0);
-
+                //std::cout << "\nrecv\n";
                 if (iResult == -1) {
                     std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
                     signalHandler(0);
@@ -613,55 +685,36 @@ void keepAliveThread() {
         // message starts at [8+6] and ends with a null byte (0x00)
         
         if (messageBuffer[6] > 0xF) {
-            std::cout << "\nStudent: ";
+            clearLine();
+            std::cout << "Student: ";
             for (int i = 0xE; i < bytesReceived; i++) {
                 printf("%c", messageBuffer[i]);
             }
             std::cout << "\n";
+            std::cout << "> " << currentInputString;
         }
         
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
+
 void beginChat() {
     clearScreen();
-
-    ////////////////////////////////////////////////
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    int consoleWidth, consoleHeight;
-
-    // Get the console screen buffer information
-    if (GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-        consoleWidth = csbi.dwSize.X;
-        consoleHeight = csbi.dwSize.Y;
-
-        // Set the cursor position to the bottom line
-        COORD bottomLine = { 0, (SHORT)--consoleHeight};  // X is 0, Y is bottom row
-        SetConsoleCursorPosition(hConsole, bottomLine);
-    }
-    ////////////////////////////////////////////////
-
-
+    int consoleHeight = GetConsoleDimensions().X;
+    COORD bottomLine = { 0, (SHORT)--consoleHeight};
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), bottomLine);
 
     closesocket(s);
     connectToIP(ip);
+
     runChatThread = true;
     std::thread chatThreadInstance(keepAliveThread);
 
     std::string message = "$failed";
-    
 
     while (true) {
-        message = "$failed";
-        while (message == "$failed") {
-            std::cout << "> ";
-            message = inputString(1000);
-        }
-        if (message == "$empty") {
-            message = "";
-        }
+        message = handleInput(1000);
         int messageLength = (int)message.length();
         if (message == "$exit") {
             uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 141 /*length*/, 0x00 , 0x00 , 0x00, 0x02 };
