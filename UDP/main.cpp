@@ -4,14 +4,26 @@
 #include <ws2tcpip.h>
 #include <thread>
 #include <csignal>
+#include <sstream>
+#include <unordered_map>
 #pragma comment(lib, "Ws2_32.lib")
+
+using std::unordered_map;
+using std::cerr;
+using std::cout;
+using std::cin;
+using std::endl;
+using std::string;
+using std::this_thread::sleep_for;
+using std::chrono::seconds;
+using std::stringstream;
 
 int getOwnIP(uint8_t* buf)
 {
     char ac[80];
     if (gethostname(ac, sizeof(ac)) == SOCKET_ERROR) {
-        std::cerr << "Error " << WSAGetLastError() <<
-            " when getting local host name." << std::endl;
+        cerr << "Error " << WSAGetLastError() <<
+            " when getting local host name." << endl;
         return 1;
     }
 
@@ -19,7 +31,7 @@ int getOwnIP(uint8_t* buf)
     hints.ai_family = AF_INET;  // IPv4
 
     if (getaddrinfo(ac, nullptr, &hints, &res) != 0) {
-        std::cerr << "Yow! Bad host lookup." << std::endl;
+        cerr << "Yow! Bad host lookup." << endl;
         return 1;
     }
 
@@ -28,17 +40,17 @@ int getOwnIP(uint8_t* buf)
     for (ptr = res; ptr != nullptr; ptr = ptr->ai_next) {
         struct sockaddr_in* sockaddr_ipv4 = (struct sockaddr_in*)ptr->ai_addr;
         inet_ntop(AF_INET, &(sockaddr_ipv4->sin_addr), ipstr, sizeof(ipstr));
-        std::cout << "Address: " << ipstr << std::endl;
+        cout << "Address: " << ipstr << endl;
         unsigned char* bytes = (unsigned char*)&sockaddr_ipv4->sin_addr.s_addr;
-        std::cout << "Bytes: ";
+        cout << "Bytes: ";
         for (int i = 0; i < 4; i++) {
             buf[i] = bytes[i];
-            std::printf("%02x", bytes[i]);
+            printf("%02x", bytes[i]);
             if (i < 3) {
-                std::cout << ".";
+                cout << ".";
             }
         }
-        std::cout << "\n";
+        cout << "\n";
     }
 
     freeaddrinfo(res);  // Free the linked list
@@ -46,29 +58,49 @@ int getOwnIP(uint8_t* buf)
     return 0;
 }
 
+unordered_map<string, string> students;
 void buffer2Info(uint8_t* buf) {
-    std::cout << "Student: ";
+    cout << "Student: ";
+    stringstream ss;
     for (int i = 0; i < 4; i++) {
-        std::cout << (int)buf[18 + i];
+        ss << (int)buf[18 + i];
         if (i < 3) {
-            std::cout << '.';
+            ss << '.';
         }
     }
-    std::cout << " | ";
+    string ipAddress = ss.str();
+    cout << ipAddress;
+    
+
+
+    ss.str(string());
+
+    ss << " | ";
     for (int i = 0; i < buf[26]; i++) {
-        std::cout << buf[30 + i];
+        ss << buf[30 + i];
     }
-    std::cout << " | ";
+    ss << " | ";
     int i = 0;
     while (true) {
-        std::cout << buf[98 + i];
+        ss << buf[98 + i];
         i++;
         if (buf[98 + i] == 0) {
             break;
         }
     }
-    std::cout << "\n";
+    string studentInfo = ss.str();
+    
+    if (students[ipAddress] == studentInfo) {
+        std::cout << " --> duplicate student!\n";
+    }
+    else {
+        students[ipAddress] = studentInfo;
+        cout << studentInfo;
+        cout << "\n";
+    }
+    
 }
+
 SOCKET s = INVALID_SOCKET;
 void signalHandler(int signalCode) {
     closesocket(s);
@@ -80,20 +112,20 @@ int main() {
 
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        std::cerr << "WSAStartup failed." << std::endl;
+        cerr << "WSAStartup failed." << endl;
         return 1;
     }
 
 
     s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
-        std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
+        cerr << "Socket creation failed: " << WSAGetLastError() << endl;
         WSACleanup();
         return 1;
     }
     bool broadcast = true;
     if (setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&broadcast, sizeof(broadcast)) == SOCKET_ERROR) {
-        std::cerr << "Failed to set socket option: " << WSAGetLastError() << std::endl;
+        cerr << "Failed to set socket option: " << WSAGetLastError() << endl;
         closesocket(s);
         WSACleanup();
         return 1;
@@ -108,12 +140,12 @@ int main() {
     getOwnIP(message + 10);
     int sendResult = sendto(s, reinterpret_cast<const char*>(message), 22, 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
     if (sendResult == SOCKET_ERROR) {
-        std::cerr << "Broadcast send failed: " << WSAGetLastError() << std::endl;
+        cerr << "Broadcast send failed: " << WSAGetLastError() << endl;
         closesocket(s);
         WSACleanup();
         return 1;
     }
-    std::cout << "\n";
+    cout << "\n";
     uint8_t* messageBuffer = new uint8_t[512];
     memset(messageBuffer, 0, sizeof(messageBuffer));
     sockaddr from;
@@ -127,7 +159,7 @@ int main() {
     while (true) {
         int sendResult = sendto(s, reinterpret_cast<const char*>(message), 22, 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
         if (sendResult == SOCKET_ERROR) {
-            std::cerr << "Broadcast send failed: " << WSAGetLastError() << std::endl;
+            cerr << "Broadcast send failed: " << WSAGetLastError() << endl;
             closesocket(s);
             WSACleanup();
             return 1;
@@ -136,15 +168,15 @@ int main() {
         int recvLength = recvfrom(s, reinterpret_cast<char*>(messageBuffer), 0xFF, 0, &from, &fromlen);
         if (recvLength == SOCKET_ERROR) {
             if (WSAGetLastError() == WSAETIMEDOUT) {
-                std::cerr << "recvfrom timed out." << "\n";
+                cerr << "recvfrom timed out." << "\n";
             }
             else {
-                std::cerr << "recvfrom failed: " << WSAGetLastError() << "\n";
+                cerr << "recvfrom failed: " << WSAGetLastError() << "\n";
             }
         }
         else {
             buffer2Info(messageBuffer);
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            sleep_for(seconds(1));
         }
     }
     
@@ -152,3 +184,4 @@ int main() {
     WSACleanup();
     return 0;
 }
+using std::string;
