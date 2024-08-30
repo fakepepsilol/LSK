@@ -2,6 +2,8 @@
 #include <ws2tcpip.h>
 #include <iostream>
 #include <ws2tcpip.h>
+#include <thread>
+#include <csignal>
 #pragma comment(lib, "Ws2_32.lib")
 
 int getOwnIP(uint8_t* buf)
@@ -67,8 +69,15 @@ void buffer2Info(uint8_t* buf) {
     }
     std::cout << "\n";
 }
+SOCKET s = INVALID_SOCKET;
+void signalHandler(int signalCode) {
+    closesocket(s);
+    exit(signalCode);
+}
 
 int main() {
+    signal(SIGINT, signalHandler);
+
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         std::cerr << "WSAStartup failed." << std::endl;
@@ -76,7 +85,7 @@ int main() {
     }
 
 
-    SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
         std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
         WSACleanup();
@@ -104,15 +113,41 @@ int main() {
         WSACleanup();
         return 1;
     }
+    std::cout << "\n";
     uint8_t* messageBuffer = new uint8_t[512];
     memset(messageBuffer, 0, sizeof(messageBuffer));
     sockaddr from;
     int fromlen = 16;
     memset(&from, 0, sizeof(from));
     fromlen = 16;
-    int recvLength = recvfrom(s, reinterpret_cast<char*>(messageBuffer), 0xFF, 0, &from, &fromlen);
-    std::cout << "\n";
-    buffer2Info(messageBuffer);
+
+    int timeout = 1000;
+    
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+    while (true) {
+        int sendResult = sendto(s, reinterpret_cast<const char*>(message), 22, 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
+        if (sendResult == SOCKET_ERROR) {
+            std::cerr << "Broadcast send failed: " << WSAGetLastError() << std::endl;
+            closesocket(s);
+            WSACleanup();
+            return 1;
+        }
+        memset(messageBuffer, 0, sizeof(messageBuffer));
+        int recvLength = recvfrom(s, reinterpret_cast<char*>(messageBuffer), 0xFF, 0, &from, &fromlen);
+        if (recvLength == SOCKET_ERROR) {
+            if (WSAGetLastError() == WSAETIMEDOUT) {
+                std::cerr << "recvfrom timed out." << "\n";
+            }
+            else {
+                std::cerr << "recvfrom failed: " << WSAGetLastError() << "\n";
+            }
+        }
+        else {
+            buffer2Info(messageBuffer);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+    
     closesocket(s);
     WSACleanup();
     return 0;
