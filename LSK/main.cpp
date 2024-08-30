@@ -46,7 +46,6 @@ COORD GetConsoleCursorPosition()
     }
     else
     {
-        // The function failed. Call GetLastError() for details.
         COORD invalid = { 0, 0 };
         std::cout << "getConsoleCursorPosition failed nigger.\n\n";
         return invalid;
@@ -59,7 +58,7 @@ COORD GetConsoleDimensions() {
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
     columns = csbi.srWindow.Right - csbi.srWindow.Left + 1;
     rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-    COORD dimensions = { columns, rows };
+    COORD dimensions = { (SHORT)columns, (SHORT)rows };
     return dimensions;
 }
 void gotoxy(short x, short y)
