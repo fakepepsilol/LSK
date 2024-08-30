@@ -26,6 +26,7 @@ int key;
 int seed;
 int currentInputLength = -1;
 std::string currentInputString;
+int pendingReads = 0;
 
 int shiftLeft(int byte);
 int shiftRight(int byte);
@@ -70,6 +71,8 @@ void gotoxy(short x, short y)
 }
 void clearLine() {
     gotoxy(GetConsoleDimensions().X - 1, GetConsoleCursorPosition().Y);
+    std::cout << " ";
+    gotoxy(GetConsoleDimensions().X - 1, GetConsoleCursorPosition().Y - 1);
     for (int i = 0; i < GetConsoleDimensions().X - 1; i++) {
         std::cout << "\b \b";
     }
@@ -520,9 +523,22 @@ std::string handleInput(int maxLength) {
         }
         else if (ch == 8) {
             if (!currentInputString.empty()) {
-                currentInputLength--;
-                currentInputString.pop_back();
-                std::cout << "\b \b";
+                if (GetConsoleCursorPosition().X == 0) {
+                    currentInputString.pop_back();
+                    currentInputLength--;
+                    for (int i = 0; i < std::ceil((float)(currentInputLength + 2) / (float)GetConsoleDimensions().X); i++) {
+                        gotoxy(GetConsoleCursorPosition().X, GetConsoleCursorPosition().Y - 1);
+                        clearLine();
+                    }
+                    std::cout << "> " << currentInputString;
+                    
+                }
+                else {
+                    currentInputLength--;
+                    currentInputString.pop_back();
+                    std::cout << "\b \b";
+                }
+                
             }
         }
         else if (currentInputLength < maxLength && (ch >= 32 && ch <= 126)) {
@@ -646,52 +662,57 @@ void sendMessage() {
 
 void keepAliveThread() {
     while (runChatThread){
-        uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x8d, 0x00 , 0x00 , 0x00, 0x08}; //keep-alive-packet-thingy
+        uint8_t data[11] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x0b, 0x00 , 0x00 , 0x00, 0x08}; //keep-alive-packet-thingy
         encode(data, key);
-        memset(data + 11, 0, sizeof(data) - 11);
-        iResult = send(s, reinterpret_cast<const char*>(data), 141, 0);
-        if (iResult != 141) {
+        //memset(data + 11, 0, sizeof(data) - 11);
+        iResult = send(s, reinterpret_cast<const char*>(data), 11, 0);
+        pendingReads++;
+        if (iResult != 11) {
             std::cerr << "\nSend failed: " << WSAGetLastError();
             closesocket(s);
             exit(1);
         }
-        char recvData[0xFF];
-        char messageBuffer[0xFF];
-        int bytesReceived = 8;
-        memset(messageBuffer, 0, sizeof(messageBuffer));
-        iResult = recv(s, recvData, 8, 0);
-        if (iResult == -1) {
-            std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
-            signalHandler(0);
-        }
-        else {
-            memcpy(messageBuffer, recvData, 8);
-            int totalLength = recvData[6];
+        for (int i = pendingReads; i > 0; i--) {
+            char recvData[0xFF];
+            char messageBuffer[0xFF];
+            int bytesReceived = 8;
+            memset(messageBuffer, 0, sizeof(messageBuffer));
+            iResult = recv(s, recvData, 8, 0);
+            if (iResult == -1) {
+                std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
+                signalHandler(0);
+            }
+            else {
+                memcpy(messageBuffer, recvData, 8);
+                int totalLength = recvData[6];
 
-            while (bytesReceived < totalLength) {
-                int remaining = totalLength - bytesReceived;
-                iResult = recv(s, messageBuffer + bytesReceived, remaining, 0);
-                //std::cout << "\nrecv\n";
-                if (iResult == -1) {
-                    std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
-                    signalHandler(0);
-                    break;
+                while (bytesReceived < totalLength) {
+                    int remaining = totalLength - bytesReceived;
+                    iResult = recv(s, messageBuffer + bytesReceived, remaining, 0);
+                    //std::cout << "\nrecv\n";
+                    if (iResult == -1) {
+                        std::cout << "[!] Recv failed (" << WSAGetLastError() << ")\n";
+                        signalHandler(0);
+                        break;
+                    }
+
+                    bytesReceived += iResult;
                 }
+            }
+            // message starts at [8+6] and ends with a null byte (0x00)
 
-                bytesReceived += iResult;
+            if (messageBuffer[6] > 0xF) {
+                clearLine();
+                std::cout << "Student: ";
+                for (int i = 0xE; i < bytesReceived; i++) {
+                    printf("%c", messageBuffer[i]);
+                }
+                std::cout << "\n";
+                std::cout << "> " << currentInputString;
             }
+            pendingReads--;
         }
-        // message starts at [8+6] and ends with a null byte (0x00)
         
-        if (messageBuffer[6] > 0xF) {
-            clearLine();
-            std::cout << "Student: ";
-            for (int i = 0xE; i < bytesReceived; i++) {
-                printf("%c", messageBuffer[i]);
-            }
-            std::cout << "\n";
-            std::cout << "> " << currentInputString;
-        }
         
         
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -715,18 +736,20 @@ void beginChat() {
     while (true) {
         message = handleInput(1000);
         int messageLength = (int)message.length();
-        if (message == "$exit") {
-            uint8_t data[512] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 141 /*length*/, 0x00 , 0x00 , 0x00, 0x02 };
-            memset(data + 11, 0, sizeof(data) - 11);
+        if (message == "$exit" || message == "$hide") {
+            uint8_t data[11] = { 0x47, 0x03, 0x01, 0x00, 0xda, 0xd1, 0x0b, 0x00 , 0x00 , 0x00, 0x02 };
             encode(data, key);
-            iResult = send(s, reinterpret_cast<const char*>(data), 141, 0);
-            if (iResult != 141) {
+            iResult = send(s, reinterpret_cast<const char*>(data), 11, 0);
+            if (iResult != 11) {
                 std::cerr << "\nSend failed: " << WSAGetLastError();
-                runChatThread = false;
-                closesocket(s);
-                exit(1);
+                if (message == "$exit") {
+                    runChatThread = false;
+                    closesocket(s);
+                    exit(1);
+                }
+                
             }
-            else {
+            else if(message == "$exit"){
                 runChatThread = false;
                 return;
             }
@@ -751,6 +774,7 @@ void beginChat() {
 
             encode(data, key);
             iResult = send(s, reinterpret_cast<const char*>(data), 141 + messageLength, 0);
+            pendingReads++;
             if (iResult != 141 + message.length()) {
                 std::cerr << "\nSend failed: " << WSAGetLastError() << "\n";
                 closesocket(s);
