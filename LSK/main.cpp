@@ -56,7 +56,7 @@ COORD GetConsoleCursorPosition()
   else
   {
     COORD invalid = {0, 0};
-    std::cout << "getConsoleCursorPosition failed nigger.\n\n";
+    std::cout << "getConsoleCursorPosition failed.\n\n";
     return invalid;
   }
 }
